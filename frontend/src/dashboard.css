@@ -185,3 +185,12 @@
 .board-raised-hand-icon{width:34px;height:34px;flex:none;display:grid;place-items:center;border-radius:10px;background:#fff0c1;font-size:18px}
 .board-raised-hand-copy{display:grid;flex:1;gap:3px;min-width:0}.board-raised-hand-copy b{font-size:11px}.board-raised-hand-copy small{overflow:hidden;color:#98732b;font-size:10px;text-overflow:ellipsis;white-space:nowrap}
 .board-raised-hand-alert button{height:30px;flex:none;padding:0 9px;border:1px solid #ead59e;border-radius:8px;background:#fff;color:#795b1d;font:inherit;font-size:9px;font-weight:700;cursor:pointer}.board-raised-hand-alert button:hover{background:#fff2ce}
+
+.lesson-mic-toggle,.lesson-audio-playback{height:30px;display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:0 9px;border:1px solid #e1e5ef;border-radius:8px;background:#fff;color:#65718a;font:inherit;font-size:9px;font-weight:700;white-space:nowrap;cursor:pointer}
+.lesson-mic-toggle.is-enabled{border-color:#c5e9d8;background:#f1fbf6;color:#23835d}.lesson-mic-toggle:disabled{opacity:.55;cursor:not-allowed}
+.lesson-audio-status{padding:0 9px;color:#90702a;font-size:9px;font-weight:700;white-space:nowrap}.lesson-audio-status.is-allowed{color:#23835d}.lesson-audio-error{color:#b85d66;font-size:9px;font-weight:700;white-space:nowrap}
+.lesson-audio-playback{position:absolute;z-index:12;top:64px;left:50%;transform:translateX(-50%);height:38px;padding:0 14px;border-color:#d8dafa;background:#fff;color:#565df1;box-shadow:0 8px 24px #28334d20;font-size:11px}
+.lesson-remote-audio{display:none}
+.raised-hand-student-message{max-width:min(560px,calc(100% - 24px));display:flex;align-items:center;justify-content:center;gap:8px;white-space:normal;text-align:center}.raised-hand-student-message>span{color:#a85c5c;font-size:10px}.raised-hand-student-message button{height:26px;padding:0 9px;border:1px solid #ead59e;border-radius:7px;background:#fff;color:#795b1d;font:inherit;font-size:10px;font-weight:700;cursor:pointer}
+.active-lesson-mode .board-tools .lesson-mic-toggle{height:34px;border-color:#e7eaf2;background:#fff;color:#65718a;font-size:10px}.active-lesson-mode .board-tools .lesson-mic-toggle.is-enabled{border-color:#c5e9d8;background:#f1fbf6;color:#23835d}
+@media(max-width:600px){.lesson-audio-status{max-width:145px;overflow:hidden;text-overflow:ellipsis}.active-lesson-mode .board-tools .lesson-mic-toggle{height:32px;padding:0 7px;font-size:9px}.raised-hand-student-message{top:52px!important;padding:8px 10px;font-size:10px}}

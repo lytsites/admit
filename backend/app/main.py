@@ -183,6 +183,7 @@ app = FastAPI(title="MotionClass API", version="1.0.0", lifespan=lifespan)
 board_connections: dict[str, set[WebSocket]] = {}
 board_connections_lock = asyncio.Lock()
 raised_hands: dict[str, dict[str, dict[str, str]]] = {}
+audio_permissions: dict[str, set[str]] = {}
 origins = os.getenv("FRONTEND_ORIGIN", "http://localhost:5173").split(",")
 app.add_middleware(
     CORSMiddleware,
@@ -710,6 +711,8 @@ async def end_lesson(lesson_id: str, user: dict = Depends(require_teacher)) -> d
         for session in sessions:
             connection.execute("UPDATE lesson_participant_sessions SET left_at=? WHERE connection_id=?", (now, session["connection_id"]))
             connection.execute("INSERT INTO lesson_participant_events (id, connection_id, lesson_id, user_id, event_type, occurred_at) VALUES (?, ?, ?, ?, 'lesson_ended', ?)", (str(uuid.uuid4()), session["connection_id"], lesson_id, session["user_id"], now))
+    raised_hands.pop(lesson_id, None)
+    audio_permissions.pop(lesson_id, None)
     await broadcast_lesson_message(lesson_id, {"type": "lesson_ended", "endedAt": now})
     return {"ended": True, "status": "ended", "endedAt": now}
 
@@ -871,6 +874,11 @@ async def board_connect(websocket: WebSocket, lesson_id: str) -> None:
         await websocket.send_json({"type": "ready"})
         for raised_user in raised_hands.get(lesson_id, {}).values():
             await websocket.send_json({"type": "raise_hand", **raised_user})
+        if user["role"] == "teacher":
+            for student_id in audio_permissions.get(lesson_id, set()):
+                await websocket.send_json({"type": "audio_allowed", "userId": student_id})
+        elif user["id"] in audio_permissions.get(lesson_id, set()):
+            await websocket.send_json({"type": "audio_allowed", "userId": user["id"]})
         while True:
             message = json.loads(await websocket.receive_text())
             if isinstance(message, dict) and message.get("type") == "ping":
@@ -884,8 +892,43 @@ async def board_connect(websocket: WebSocket, lesson_id: str) -> None:
             if isinstance(message, dict) and message.get("type") == "raise_hand_reset" and user["role"] == "teacher":
                 target_id = message.get("userId")
                 if isinstance(target_id, str):
+                    audio_permissions.get(lesson_id, set()).discard(target_id)
+                    await broadcast_lesson_message(lesson_id, {"type": "audio_revoked", "userId": target_id})
                     raised_hands.get(lesson_id, {}).pop(target_id, None)
                     await broadcast_lesson_message(lesson_id, {"type": "raise_hand_reset", "userId": target_id})
+                continue
+            if isinstance(message, dict) and message.get("type") == "audio_allow" and user["role"] == "teacher":
+                target_id = message.get("userId")
+                if isinstance(target_id, str) and target_id in raised_hands.get(lesson_id, {}):
+                    audio_permissions.setdefault(lesson_id, set()).add(target_id)
+                    await broadcast_lesson_message(lesson_id, {"type": "audio_allowed", "userId": target_id})
+                continue
+            if isinstance(message, dict) and isinstance(message.get("type"), str) and message.get("type") in {"audio_signal", "audio_error"}:
+                target_id = message.get("targetUserId")
+                payload = message.get("signal") if message.get("type") == "audio_signal" else None
+                if not isinstance(target_id, str):
+                    continue
+                if message.get("type") == "audio_signal":
+                    if not isinstance(payload, dict) or len(json.dumps(payload)) > 20000:
+                        continue
+                    signal_type = payload.get("type")
+                    if signal_type not in {"offer", "answer"} and not isinstance(payload.get("candidate"), str):
+                        continue
+                if user["role"] == "teacher":
+                    authorized = target_id in audio_permissions.get(lesson_id, set())
+                else:
+                    with connect_db() as connection:
+                        teacher = connection.execute("SELECT c.teacher_id FROM lessons l JOIN classes c ON c.id=l.class_id WHERE l.id=?", (lesson_id,)).fetchone()
+                    authorized = user["id"] in audio_permissions.get(lesson_id, set()) and teacher is not None and target_id in {"teacher", teacher["teacher_id"]}
+                    if authorized and teacher is not None:
+                        target_id = teacher["teacher_id"]
+                if authorized:
+                    relay = {"type": message["type"], "fromUserId": user["id"], "toUserId": target_id}
+                    if payload is not None:
+                        relay["signal"] = payload
+                    elif isinstance(message.get("detail"), str):
+                        relay["detail"] = message["detail"][:240]
+                    await broadcast_lesson_message(lesson_id, relay)
                 continue
             if not isinstance(message, dict) or message.get("type") != "drag":
                 continue
@@ -936,6 +979,11 @@ async def board_connect(websocket: WebSocket, lesson_id: str) -> None:
                 sockets.discard(websocket)
                 if not sockets:
                     board_connections.pop(lesson_id, None)
+        if "user" in locals() and user.get("role") == "student":
+            was_allowed = user["id"] in audio_permissions.get(lesson_id, set())
+            audio_permissions.get(lesson_id, set()).discard(user["id"])
+            if was_allowed:
+                await broadcast_lesson_message(lesson_id, {"type": "audio_revoked", "userId": user["id"]})
 
 
 @app.get("/api/lessons/{lesson_id}/board")
