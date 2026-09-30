@@ -1,0 +1,11 @@
+node_modules/
+dist/
+backend/data/*
+!backend/data/motionclass.sqlite
+backend/.venv/
+logs/
+__pycache__/
+*.py[cod]
+.env
+.env.*
+!.env.example
