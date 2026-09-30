@@ -6,6 +6,7 @@ backend/.venv/
 logs/
 __pycache__/
 *.py[cod]
+*.tsbuildinfo
 .env
 .env.*
 !.env.example
